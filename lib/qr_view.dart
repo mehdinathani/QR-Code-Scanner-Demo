@@ -3,7 +3,10 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:qrcodedemo/components/colors.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class QRViewExample extends StatefulWidget {
@@ -14,6 +17,9 @@ class QRViewExample extends StatefulWidget {
 }
 
 class _QRViewExampleState extends State<QRViewExample> {
+  bool isValidLink = false;
+  bool showActionButton = false;
+  bool isAppShared = false;
   Barcode? result;
   QRViewController? controller;
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
@@ -33,8 +39,9 @@ class _QRViewExampleState extends State<QRViewExample> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
-          Expanded(flex: 4, child: _buildQrView(context)),
+          Expanded(flex: 1, child: _buildQrView(context)),
           Expanded(
             flex: 1,
             child: FittedBox(
@@ -45,16 +52,66 @@ class _QRViewExampleState extends State<QRViewExample> {
                   Text(
                     (result != null)
                         ? (Uri.tryParse(result!.code ?? "") != null)
-                            ? 'Barcode Type: ${describeEnum(result!.format)}'
+                            ? 'Barcode Type: ${describeEnum(result!.format)}   Data: ${result!.code}'
                             : 'Barcode Type: ${describeEnum(result!.format)}   Data: ${result!.code}'
                         : 'Scan a code',
                   ),
-                  // if (result != null)
-
-                  //   Text(
-                  //       'Barcode Type: ${describeEnum(result!.format)}   Data: ${result!.code}')
-                  // else
-                  //   const Text('Scan a code'),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Visibility(
+                        visible: showActionButton,
+                        child: Container(
+                          margin: const EdgeInsets.all(8),
+                          child: ElevatedButton(
+                            style: ButtonStyle(
+                                backgroundColor: AppColors.buttonColor),
+                            onPressed: () async {
+                              await copyText();
+                            },
+                            child: const Text("Copy Text"),
+                          ),
+                        ),
+                      ),
+                      Visibility(
+                        visible: showActionButton,
+                        child: Container(
+                          margin: const EdgeInsets.all(8),
+                          child: ElevatedButton(
+                            style: ButtonStyle(
+                                backgroundColor: AppColors.buttonColor),
+                            onPressed: () async {
+                              await redirctToLink();
+                            },
+                            child: const Text("Go to the Link"),
+                          ),
+                        ),
+                      ),
+                      Visibility(
+                        visible: showActionButton,
+                        child: Container(
+                          margin: const EdgeInsets.all(8),
+                          child: ElevatedButton(
+                            style: ButtonStyle(
+                                backgroundColor: AppColors.buttonColor),
+                            onPressed: () async {
+                              await shareFunction();
+                            },
+                            child: const Row(
+                              children: [
+                                Icon(Icons.share),
+                                SizedBox(
+                                  width: 4,
+                                ),
+                                Text("Share Results")
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
@@ -62,14 +119,11 @@ class _QRViewExampleState extends State<QRViewExample> {
                       Container(
                         margin: const EdgeInsets.all(8),
                         child: ElevatedButton(
+                            style: ButtonStyle(
+                                backgroundColor: AppColors.buttonColor),
                             onPressed: () async {
-                              if (result != null &&
-                                  Uri.tryParse(result!.code ?? "") != null) {
-                                // Check again if the scanned code is a valid URL and launch a browser.
-                                await launch(result!.code ?? "");
-                              } else {
-                                await controller?.toggleFlash();
-                              }
+                              await controller?.toggleFlash();
+
                               setState(() {});
                             },
                             child: FutureBuilder(
@@ -82,6 +136,8 @@ class _QRViewExampleState extends State<QRViewExample> {
                       Container(
                         margin: const EdgeInsets.all(8),
                         child: ElevatedButton(
+                            style: ButtonStyle(
+                                backgroundColor: AppColors.buttonColor),
                             onPressed: () async {
                               await controller?.flipCamera();
                               setState(() {});
@@ -107,6 +163,8 @@ class _QRViewExampleState extends State<QRViewExample> {
                       Container(
                         margin: const EdgeInsets.all(8),
                         child: ElevatedButton(
+                          style: ButtonStyle(
+                              backgroundColor: AppColors.buttonColor),
                           onPressed: () async {
                             await controller?.pauseCamera();
                           },
@@ -117,15 +175,37 @@ class _QRViewExampleState extends State<QRViewExample> {
                       Container(
                         margin: const EdgeInsets.all(8),
                         child: ElevatedButton(
+                          style: ButtonStyle(
+                              backgroundColor: AppColors.buttonColor),
                           onPressed: () async {
                             await controller?.resumeCamera();
                           },
                           child: const Text('resume',
                               style: TextStyle(fontSize: 20)),
                         ),
-                      )
+                      ),
                     ],
                   ),
+                  const SizedBox(
+                    height: 80,
+                  ),
+                  InkWell(
+                    onTap: shareTheApp,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.share),
+                        const SizedBox(
+                          width: 10,
+                        ),
+                        Text(
+                          isAppShared
+                              ? "Thank you for Sharing the App"
+                              : "Did you like? Share with friends.",
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  )
                 ],
               ),
             ),
@@ -163,6 +243,8 @@ class _QRViewExampleState extends State<QRViewExample> {
     controller.scannedDataStream.listen((scanData) {
       setState(() {
         result = scanData;
+        isValidLink = Uri.tryParse(result!.code ?? "")?.isAbsolute != null;
+        showActionButton = result!.code != null;
       });
     });
   }
@@ -180,5 +262,44 @@ class _QRViewExampleState extends State<QRViewExample> {
   void dispose() {
     controller?.dispose();
     super.dispose();
+  }
+
+  redirctToLink() async {
+    if (isValidLink) {
+      await launch(result!.code ?? "");
+    }
+  }
+
+  copyText() async {
+    await Clipboard.setData(
+      ClipboardData(
+        text: result!.code.toString(),
+      ),
+    );
+  }
+
+  shareFunction() async {
+    final shareResult = await Share.shareWithResult(
+        " ${result!.code} scanned using QR Code scanner by mehdinatani.");
+    if (shareResult.status == ShareResultStatus.success) {
+      const SnackBar(content: Text("Thank you for sharing!"));
+      if (kDebugMode) {
+        print("Thank you for sharing!");
+      }
+    }
+  }
+
+  shareTheApp() async {
+    final appShareResult = await Share.shareWithResult(
+        " I have found the Great QR Code scanner by mehdinatani.");
+    if (appShareResult.status == ShareResultStatus.success) {
+      isAppShared = true;
+      setState(() {});
+      const SnackBar(content: Text("Thank you for sharing!"));
+      if (kDebugMode) {
+        print("Thank you for sharing!");
+        print(isAppShared);
+      }
+    }
   }
 }
